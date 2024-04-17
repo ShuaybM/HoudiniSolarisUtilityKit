@@ -1,0 +1,153 @@
+########################### Setup ###########################
+
+import hou
+from PySide2.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QPushButton, QLabel
+import os
+import sys
+
+
+stage = hou.node("/stage")
+obj = hou.node("/obj")
+
+########################### PySide ###########################
+
+class InputDialog(QDialog): #PySide Window
+    def __init__(self):
+        super(InputDialog, self).__init__()
+        
+        #Setup
+        self.setWindowTitle("Solaris Setup")
+        self.setMinimumSize(300,100)
+        layout = QVBoxLayout()
+        
+        #Label
+        label = QLabel("Enter node name to import:")
+        layout.addWidget(label)
+        
+        
+        #Editable Line
+        self.input_text = QLineEdit()
+        layout.addWidget(self.input_text)
+        
+        #Confirm Button
+        confirm_button = QPushButton("OK")
+        confirm_button.clicked.connect(self.confirm_input)
+        layout.addWidget(confirm_button)
+        
+        self.setLayout(layout)
+        
+    def confirm_input(self): #Saving input and closing window
+        input_text = self.input_text.text()
+        self.close()
+        
+        return input_text
+        
+        
+########################### Functions ###########################
+
+def resetSolaris(): #Resets stage context
+    all = stage.allItems()
+    stage.deleteItems(all)
+    
+
+def basicNodeTree(): #Creates basic node tree
+    #Create Nodes
+    material_library = stage.createNode("materiallibrary")
+    lights_merge = stage.createNode("merge", "Light_Merge")
+    camera = stage.createNode("camera")
+    karma = stage.createNode("karmarenderproperties")
+    render = stage.createNode("usdrender_rop")
+    
+    #Link Nodes
+    lights_merge.setInput(0, material_library)
+    camera.setInput(0, lights_merge)
+    karma.setInput(0, camera)
+    render.setInput(0, karma)
+    
+    return material_library, lights_merge #Returns connections for imports and lights
+    
+
+def sopImport(_args): #Creates SOP imports based upon user input
+    if _args is "": #If input is empty
+        hou.ui.displayMessage("No nodes matching that name found.\nCreated without imports.")
+        sop_import_merge = None
+        return False, sop_import_merge
+        
+    sop_import_merge = stage.createNode("merge") #Creates the merge
+    i = 0
+    nodes_created = False
+    
+    for node in obj.allSubChildren(): #For all nodes in stage
+        if isinstance(node, hou.SopNode) and _args in node.name(): #If they're a SOP node and the argument is in the name
+            new_import_node = stage.createNode("sopimport")
+            new_import_node.parm("soppath").set(node.path()) #Saves SOP import path to node path
+            new_import_node.parm("pathprefix").set("/geometry/" + node.name()) #Sets the path prefix to fit under 'geometry'
+            sop_import_merge.setInput(i, new_import_node)
+            i += 1 
+            nodes_created = True
+                        
+    if nodes_created: #If anything was created, let the user know
+        hou.ui.displayMessage("All imports created.")
+        return True, sop_import_merge
+    else: #If nothing was created, let the user know
+        hou.ui.displayMessage("No nodes matching that name found.\nCreated without imports.")
+        sop_import_merge.destroy()
+        sop_import_merge = None
+        return False, sop_import_merge
+
+
+def lightingNodes(): #Creates lights
+    #Creates nodes
+    key_light = stage.createNode("light::2.0", "Key_Light")
+    rim_light = stage.createNode("light::2.0", "RimLight")
+    fill_light = stage.createNode("domelight::2.0", "FillLight")
+    lights_merge = stage.createNode("merge")
+    light_mixer = stage.createNode("lightmixer")
+    
+    #Set light properties
+    key_light.parm("lighttype").set(4)
+    rim_light.parm("lighttype").set(1)
+
+    #Link Nodes
+    lights_merge.setInput(0, key_light)
+    lights_merge.setInput(1, rim_light)
+    lights_merge.setInput(2, fill_light)
+    light_mixer.setInput(0, lights_merge)
+    
+    return light_mixer  #Returns connection point to link back to node tree
+
+def addToNetworkBox(names, colorR = 0.6, colorG = 0.6, colorB = 0.6): #Adds nodes to a network box
+    network_box = stage.createNetworkBox() 
+    for name in names:  #For each part of the array given
+        for node in stage.allSubChildren(): #For every node in stage
+            if node.type().name() == name:  #If the node name is the same as the name inputted
+                network_box.addItem(node)   #Add to box
+    network_box.fitAroundContents() #Resize box
+    network_box.setColor(hou.Color(colorR, colorG, colorB)) #Set colour of network box if given
+   
+    
+########################### Running PySide ###########################
+    
+dialog = InputDialog()
+dialog.exec_()
+
+user_import_text = dialog.confirm_input()
+
+
+########################### Running Functions ###########################
+
+resetSolaris()
+node_connections = basicNodeTree()
+material_library = node_connections[0]
+lights_merge = node_connections[1]
+sop_import_value, sop_import_merge = sopImport(user_import_text)
+light_mixer = lightingNodes()
+material_library.setInput(0, sop_import_merge)
+lights_merge.setInput(1, light_mixer)
+stage.layoutChildren()
+
+addToNetworkBox(["light::2.0", "domelight::2.0"],0.808, 0.605, 0.160)   
+if sop_import_value == True:
+    addToNetworkBox(["sopimport"], 0.65, 0.35, 0.45)
+
+    
