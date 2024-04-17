@@ -1,5 +1,4 @@
 ########################### CREATED BY SHUAYB MALIK###########################
-########################### FEEL FREE TO REACH OUT TO ME ON LINKEDIN OR ON DISCORD AT USERNAME SHANKABAT###########################
 ########################### Setup ###########################
 
 import hou
