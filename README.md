@@ -1,13 +1,13 @@
 # HoudiniSolarisUtilityKit
 Python tools for HoudiniFX, with a focus on Solaris and USD
 
-##Current Tools
+## Current Tools
 Auto setup Solaris scene by importing everything from the obj level
 Auto generate a Karma Material from a folder of Texture files
 
 
 
-###Roadmap
+### Roadmap
 Will recieve continual development as I get more time. This was initially made for a university project but I want to continue it further
 
 
